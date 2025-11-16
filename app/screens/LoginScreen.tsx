@@ -2,6 +2,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -13,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { RootStackParamList } from '../../App';
+import { login } from '../../services/auth.api';
 
 type LoginScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -21,10 +23,39 @@ type LoginScreenProps = {
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
-  const handleLogin = (): void => {
-    // Add your login logic here
-    navigation.navigate('Dashboard');
+  const handleLogin = async (): Promise<void> => {
+    // Validasi input
+    if (!email.trim() || !password.trim()) {
+      setError('Email dan password harus diisi');
+      return;
+    }
+
+    // Validasi format email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Format email tidak valid');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await login(email, password);
+      
+      // Login berhasil - langsung ke Dashboard
+      navigation.navigate('Dashboard');
+    } catch (err: any) {
+      // Tampilkan error dari API
+      const errorMessage = err.message || 'Login gagal, silakan coba lagi';
+      setError(errorMessage);
+      console.error('Login error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -56,7 +87,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               placeholder="Email"
               placeholderTextColor="#999"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                setError(''); // Clear error saat user mengetik
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -66,15 +100,29 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               placeholder="Password"
               placeholderTextColor="#999"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                setError(''); // Clear error saat user mengetik
+              }}
               secureTextEntry
             />
 
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
             <TouchableOpacity
-              style={styles.continueButton}
+              style={[styles.continueButton, loading && styles.continueButtonDisabled]}
               onPress={handleLogin}
+              disabled={loading}
             >
-              <Text style={styles.continueButtonText}>Continue</Text>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.continueButtonText}>Continue</Text>
+              )}
             </TouchableOpacity>
 
             <View style={styles.dividerContainer}>
@@ -197,6 +245,22 @@ const styles = StyleSheet.create({
   termsLink: {
     color: '#4CB5F5',
     textDecorationLine: 'underline',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#f44336',
+  },
+  errorText: {
+    color: '#d32f2f',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  continueButtonDisabled: {
+    opacity: 0.6,
   },
 });
 
