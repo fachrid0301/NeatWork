@@ -73,30 +73,69 @@ const getBaseURL = () => {
 
 const BASE_URL = getBaseURL();
 
-// Helper untuk mendapatkan token dari storage
+// Helper storage yang mendukung SecureStore (mobile) & localStorage (web)
+const isWeb = Platform.OS === 'web';
+const hasSecureStore =
+  SecureStore &&
+  typeof SecureStore.getItemAsync === 'function' &&
+  typeof SecureStore.setItemAsync === 'function' &&
+  typeof SecureStore.deleteItemAsync === 'function';
+
 const getToken = async () => {
   try {
-    // Menggunakan expo-secure-store untuk menyimpan token dengan aman
-    return await SecureStore.getItemAsync('access_token');
+    if (isWeb) {
+      return typeof window !== 'undefined'
+        ? window.localStorage.getItem('access_token')
+        : null;
+    }
+
+    if (hasSecureStore) {
+      return await SecureStore.getItemAsync('access_token');
+    }
+
+    console.warn('SecureStore tidak tersedia; token tidak dapat diambil.');
+    return null;
   } catch (error) {
     console.error('Error getting token:', error);
     return null;
   }
 };
 
-// Helper untuk menyimpan token
 const saveToken = async (token) => {
   try {
-    await SecureStore.setItemAsync('access_token', token);
+    if (isWeb) {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('access_token', token);
+      }
+      return;
+    }
+
+    if (hasSecureStore) {
+      await SecureStore.setItemAsync('access_token', token);
+      return;
+    }
+
+    console.warn('SecureStore tidak tersedia; token tidak disimpan.');
   } catch (error) {
     console.error('Error saving token:', error);
   }
 };
 
-// Helper untuk menghapus token
 const removeToken = async () => {
   try {
-    await SecureStore.deleteItemAsync('access_token');
+    if (isWeb) {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('access_token');
+      }
+      return;
+    }
+
+    if (hasSecureStore) {
+      await SecureStore.deleteItemAsync('access_token');
+      return;
+    }
+
+    console.warn('SecureStore tidak tersedia; token tidak dihapus.');
   } catch (error) {
     console.error('Error removing token:', error);
   }

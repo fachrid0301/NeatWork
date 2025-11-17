@@ -1,480 +1,503 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-  Dimensions,
-  StatusBar,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../App';
+import './DashboardScreen.css';
+import PesananScreen from './PesananScreen';
 
-const { width } = Dimensions.get('window');
-
-type DashboardScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
-};
-
-type StatCardProps = {
-  title: string;
-  value: string;
-  icon: string;
-  color: string;
-};
-
-type MenuItem = {
+type Service = {
   id: number;
   title: string;
-  icon: string;
-  color: string;
+  description: string;
+  price?: string;
+  image: string;
+  bgColor: string;
+  badge?: string;
+  route: string;
 };
 
-type NavItem = {
-  id: number;
-  name: string;
-  icon: string;
-};
+const NeatWork = () => {
+  const [activeTab, setActiveTab] = useState('beranda');
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentPage, setCurrentPage] = useState('home');
 
-const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState<number>(1);
+  const promoSlides = [
+    {
+      title: "Cukup Klik Klik Klik",
+      subtitle: "Rumah Rapi & Resik",
+      discount: "15%",
+      code: "MIDWEEKDEALNOV",
+      period: "Periode: 10 - 24 November 2025",
+      emoji: "🏠✨"
+    },
+    {
+      title: "Promo Akhir Tahun",
+      subtitle: "Bersih Total!",
+      discount: "20%",
+      code: "NEWYEAR2025",
+      period: "Periode: 1 - 31 Desember 2025",
+      emoji: "🎉🎊"
+    },
+    {
+      title: "Weekend Special",
+      subtitle: "Santai, Rumah Bersih",
+      discount: "10%",
+      code: "WEEKEND2025",
+      period: "Setiap Sabtu & Minggu",
+      emoji: "🌟💫"
+    }
+  ];
 
-  const handleLogout = (): void => {
-    navigation.navigate('Login');
+  const services: Service[] = [
+    {
+      id: 1,
+      title: "ART (per jam)",
+      description: "Pembersihan umum, asisten rumahan (alatmu)",
+      price: "40rb/jam",
+      image: "🧹",
+      bgColor: "service-card-blue",
+      route: "art-service"
+    },
+    {
+      id: 2,
+      title: "Deep Cleaning",
+      description: "Cleaning bergaransi kualitas dengan alat lengkap",
+      price: "80rb/jam",
+      image: "✨",
+      bgColor: "service-card-purple",
+      route: "deep-cleaning"
+    },
+    {
+      id: 3,
+      title: "Subscription & Ticket",
+      description: "Langganan pembersihan rumah",
+      image: "🎫",
+      bgColor: "service-card-green",
+      badge: "Popular",
+      route: "subscription"
+    }
+  ];
+
+  const handleOrderService = (service: Service) => {
+    setCurrentPage(service.route);
+    setActiveTab('beranda');
   };
 
-  const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color }) => (
-    <View style={[styles.statCard, { borderLeftColor: color }]}>
-      <View style={styles.statContent}>
-        <Text style={styles.statTitle}>{title}</Text>
-        <Text style={styles.statValue}>{value}</Text>
-      </View>
-      <View style={[styles.statIcon, { backgroundColor: color + '20' }]}>
-        <Text style={styles.iconText}>{icon}</Text>
-      </View>
-    </View>
+  const handleBackToHome = () => {
+    setCurrentPage('home');
+    setActiveTab('beranda');
+  };
+
+  // Service Detail Page Component
+  const ServiceDetailPage = ({ service }: { service: Service }) => (
+    <div className="service-detail-page">
+      {/* Header */}
+      <div className="service-detail-header">
+        <button 
+          onClick={handleBackToHome}
+          className="back-button"
+        >
+          <span className="back-button-icon">←</span>
+          <span className="back-button-text">Kembali</span>
+        </button>
+        <div className="service-detail-header-main">
+          <div className="service-detail-icon">
+            {service.image}
+          </div>
+          <div className="service-detail-header-text">
+            <h1 className="service-detail-title">{service.title}</h1>
+            {service.price && (
+              <p className="service-detail-price">{service.price}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="service-detail-content">
+        {/* Description */}
+        <div className="card card-spacing">
+          <h2 className="card-title">
+            <span className="card-title-icon">📝</span>
+            Deskripsi Layanan
+          </h2>
+          <p className="card-text">{service.description}</p>
+        </div>
+
+        {/* Features */}
+        <div className="card card-spacing">
+          <h2 className="card-title">
+            <span className="card-title-icon">⭐</span>
+            Keunggulan
+          </h2>
+          <div className="card-list">
+            <div className="card-list-item">
+              <span className="card-list-icon">✅</span>
+              <p className="card-text">Tenaga profesional terlatih</p>
+            </div>
+            <div className="card-list-item">
+              <span className="card-list-icon">✅</span>
+              <p className="card-text">Garansi kepuasan 100%</p>
+            </div>
+            <div className="card-list-item">
+              <span className="card-list-icon">✅</span>
+              <p className="card-text">Booking mudah & cepat</p>
+            </div>
+            <div className="card-list-item">
+              <span className="card-list-icon">✅</span>
+              <p className="card-text">Pembayaran fleksibel</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Booking Form */}
+        <div className="card card-spacing">
+          <h2 className="card-title">
+            <span className="card-title-icon">📅</span>
+            Pilih Jadwal
+          </h2>
+          
+          <div className="form-grid">
+            <div>
+              <label className="form-label">Tanggal</label>
+              <input 
+                type="date" 
+                className="form-input"
+              />
+            </div>
+            
+            <div>
+              <label className="form-label">Waktu</label>
+              <select className="form-input">
+                <option>08:00 - 10:00</option>
+                <option>10:00 - 12:00</option>
+                <option>13:00 - 15:00</option>
+                <option>15:00 - 17:00</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label">Durasi (jam)</label>
+              <input 
+                type="number" 
+                min="1"
+                defaultValue="2"
+                className="form-input"
+              />
+            </div>
+
+            <div>
+              <label className="form-label">Gender Petugas</label>
+              <select className="form-input">
+                <option value="">Pilih gender petugas</option>
+                <option value="female">Perempuan</option>
+                <option value="male">Laki-laki</option>
+                <option value="no-preference">Bebas / Apa saja</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label">Alamat</label>
+              <textarea 
+                rows={3}
+                placeholder="Masukkan alamat lengkap..."
+                className="form-input textarea"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Promo Code */}
+        <div className="promo-card">
+          <div className="promo-card-main">
+            <div className="promo-card-icon">🎟️</div>
+            <div>
+              <p className="promo-card-title">Punya Kode Promo?</p>
+              <p className="promo-card-text">Dapatkan diskon spesial!</p>
+            </div>
+          </div>
+          <button className="btn btn-orange">
+            Pakai
+          </button>
+        </div>
+      </div>
+
+      {/* Fixed Bottom Order Button */}
+      <div className="order-bar">
+        <div className="order-bar-top">
+          <span className="order-bar-label">Total Estimasi</span>
+          <span className="order-bar-total">Rp 80.000</span>
+        </div>
+        <button className="btn btn-primary btn-full">
+          <span>Konfirmasi Pesanan</span>
+          <span className="btn-icon">🚀</span>
+        </button>
+      </div>
+    </div>
   );
 
-  const menuItems: MenuItem[] = [
-    { id: 1, title: 'Analytics', icon: '📊', color: '#4A90E2' },
-    { id: 2, title: 'Reports', icon: '📈', color: '#7B68EE' },
-    { id: 3, title: 'Settings', icon: '⚙️', color: '#FF6B6B' },
-    { id: 4, title: 'Notifications', icon: '🔔', color: '#FFA500' },
-    { id: 5, title: 'Messages', icon: '💬', color: '#20B2AA' },
-    { id: 6, title: 'Profile', icon: '👤', color: '#9370DB' },
-  ];
+  // Home Page Component
+  const HomePage = () => (
+    <div className="dashboard">
+      {/* Header */}
+      <div className="dashboard-header">
+        <div className="dashboard-header-left">
+          <div className="dashboard-logo-icon">
+            <span className="dashboard-logo-emoji">🏠</span>
+          </div>
+          <div>
+            <h1 className="dashboard-title">NeatWork</h1>
+            <p className="dashboard-subtitle">INDONESIA</p>
+          </div>
+        </div>
+        <div className="dashboard-header-right">
+          <span className="dashboard-usage-text">50.7 KB/d</span>
+          <span className="dashboard-menu-icon">≡</span>
+        </div>
+      </div>
 
-  const navItems: NavItem[] = [
-    { id: 1, name: 'Home', icon: '🏠' },
-    { id: 2, name: 'Search', icon: '🔍' },
-    { id: 3, name: 'Add', icon: '➕' },
-    { id: 4, name: 'Activity', icon: '📱' },
-    { id: 5, name: 'Profile', icon: '👤' },
-  ];
+      {/* Main Content */}
+      <div className="dashboard-main">
+        {/* Promo Banner Carousel */}
+        <div className="promo-wrapper">
+          <div className="promo-card">
+            <div className="promo-decor-top">✨</div>
+            <div className="promo-decor-bottom">🌟</div>
+            
+            <div className="promo-content">
+              <div className="promo-header">
+                <div className="promo-text">
+                  <h2 className="promo-title">
+                    {promoSlides[currentSlide].title}
+                  </h2>
+                  <p className="promo-subtitle">
+                    {promoSlides[currentSlide].subtitle}
+                  </p>
+                  
+                  <div className="promo-discount-row">
+                    <span className="promo-discount-label">Dapatkan DISKON</span>
+                    <span className="promo-discount-value">
+                      {promoSlides[currentSlide].discount}
+                    </span>
+                  </div>
+                  
+                  <p className="promo-description">
+                    untuk pesan Cleaning di Selasa, Rabu & Kamis
+                  </p>
+                  
+                  <div className="promo-code-chip">
+                    <span className="promo-code-label">Gunakan Kode:</span>
+                    <span className="promo-code-value">
+                      {promoSlides[currentSlide].code}
+                    </span>
+                  </div>
+                  
+                  <p className="promo-period">
+                    {promoSlides[currentSlide].period}
+                  </p>
+                </div>
+                
+                <button className="btn btn-ticket">
+                  <span className="btn-ticket-icon">🎫</span>
+                  <span className="btn-ticket-text">Tiket</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="promo-dots">
+              {promoSlides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`promo-dot ${currentSlide === index ? 'promo-dot-active' : ''}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Services List */}
+        <div className="services-list">
+          {services.map((service) => (
+            <div
+              key={service.id}
+              className={`service-card ${service.bgColor}`}
+            >
+              {service.badge && (
+                <div className="service-badge">
+                  {service.badge} 🔥
+                </div>
+              )}
+              
+              <div className="service-card-main">
+                <div className="service-card-text">
+                  <h3 className="service-title">
+                    {service.title}
+                  </h3>
+                  <p className="service-description">
+                    {service.description}
+                  </p>
+                  {service.price && (
+                    <div className="service-price-row">
+                      <span className="service-price-label">Mulai Dari</span>
+                      <span className="service-price-value">
+                        {service.price}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="service-image-wrapper">
+                  <span className="service-image">
+                    {service.image}
+                  </span>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => handleOrderService(service)}
+                className="btn btn-outline service-order-button"
+              >
+                <span>Pesan Sekarang</span>
+                <span className="service-order-icon">›</span>
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Referral Banner */}
+        <div className="referral-banner">
+          <div className="referral-decor-right">👥</div>
+          <div className="referral-decor-left">💰</div>
+          
+          <div className="referral-content">
+            <p className="referral-subtitle">Bagikan 30% diskon untuk teman Anda</p>
+            <h3 className="referral-title">
+              Dapatkan 50% diskon untuk order berikutnya
+            </h3>
+            <button className="btn btn-referral">
+              <span>Perkenalkan teman</span>
+              <span className="btn-icon">🎁</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const PromoScreen = () => (
+    <div className="promo-screen">
+      <div className="promo-screen-card">
+        <span className="promo-screen-icon">💡</span>
+        <h2>Promo & Kabar Terbaru</h2>
+        <p>Kami sedang menyiapkan promo menarik khusus untukmu. Pantau terus halaman ini ya!</p>
+      </div>
+    </div>
+  );
+
+  const ProfileScreen = () => (
+    <div className="profile-screen">
+      <div className="profile-card">
+        <div className="profile-avatar">👤</div>
+        <div className="profile-info">
+          <h2>Nama Pengguna</h2>
+          <p>nama@email.com</p>
+        </div>
+        <button className="btn btn-outline profile-edit-btn">Edit Profil</button>
+      </div>
+
+      <div className="profile-menu">
+        {[
+          { icon: '📋', label: 'Riwayat Pesanan' },
+          { icon: '🏡', label: 'Alamat Favorit' },
+          { icon: '💳', label: 'Metode Pembayaran' },
+          { icon: '⚙️', label: 'Pengaturan Akun' },
+        ].map((item) => (
+          <button key={item.label} className="profile-menu-item">
+            <span className="profile-menu-icon">{item.icon}</span>
+            <span>{item.label}</span>
+            <span className="profile-menu-arrow">›</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Find current service for detail page
+  const currentService = services.find(s => s.route === currentPage);
+
+  const renderMainView = () => {
+    if (currentPage !== 'home') {
+      return currentService ? <ServiceDetailPage service={currentService} /> : <HomePage />;
+    }
+
+    switch (activeTab) {
+      case 'beranda':
+        return <HomePage />;
+      case 'pesanan':
+        return <PesananScreen />;
+      case 'promosi':
+        return <PromoScreen />;
+      case 'profil':
+        return <ProfileScreen />;
+      default:
+        return <HomePage />;
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      
-      {/* Header with Gradient */}
-      <LinearGradient
-        colors={['#003366', '#0066cc']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <Image
-              source={require('../../assets/images/Logo.png')}
-              style={styles.headerLogo}
-              resizeMode="contain"
-            />
-            <View>
-              <Text style={styles.headerTitle}>Welcome Back!</Text>
-              <Text style={styles.headerSubtitle}>John Doe</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.notificationBtn}>
-            <Text style={styles.notificationIcon}>🔔</Text>
-            <View style={styles.notificationBadge} />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+    <div className="dashboard-root">
+      {renderMainView()}
 
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Stats Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Overview</Text>
-          <View style={styles.statsContainer}>
-            <StatCard title="Total Users" value="2,547" icon="👥" color="#4A90E2" />
-            <StatCard title="Revenue" value="$45.2K" icon="💰" color="#27AE60" />
-            <StatCard title="Orders" value="1,423" icon="📦" color="#E74C3C" />
-            <StatCard title="Growth" value="+23%" icon="📈" color="#F39C12" />
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.menuGrid}>
-            {menuItems.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={styles.menuItem}
-                activeOpacity={0.7}
+      {/* Bottom Navigation - Always visible */}
+      <div className="bottom-nav">
+        <div className="bottom-nav-inner">
+          {[
+            { id: 'beranda', label: 'Beranda', emoji: '🏠' },
+            { id: 'pesanan', label: 'Pesanan', emoji: '📋' },
+            { id: 'promosi', label: 'Promosi', emoji: '💰' },
+            { id: 'profil', label: 'Profil', emoji: '👤' }
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                if (item.id === 'beranda') {
+                  handleBackToHome();
+                } else {
+                  if (currentPage !== 'home') {
+                    setCurrentPage('home');
+                  }
+                  setActiveTab(item.id);
+                }
+              }}
+              className="bottom-nav-item"
+            >
+              <div
+                className={`bottom-nav-icon-wrapper ${
+                  activeTab === item.id ? 'bottom-nav-icon-wrapper-active' : ''
+                }`}
               >
-                <LinearGradient
-                  colors={[item.color + '20', item.color + '10']}
-                  style={styles.menuIconContainer}
+                <span
+                  className={`bottom-nav-icon ${
+                    activeTab === item.id ? 'bottom-nav-icon-active' : ''
+                  }`}
                 >
-                  <Text style={styles.menuIcon}>{item.icon}</Text>
-                </LinearGradient>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {[1, 2, 3].map((item) => (
-            <View key={item} style={styles.activityCard}>
-              <View style={styles.activityIcon}>
-                <Text style={styles.activityIconText}>📋</Text>
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>New order received</Text>
-                <Text style={styles.activityTime}>{item} hour ago</Text>
-              </View>
-              <TouchableOpacity style={styles.activityBtn}>
-                <Text style={styles.activityBtnText}>View</Text>
-              </TouchableOpacity>
-            </View>
+                  {item.emoji}
+                </span>
+              </div>
+              <span
+                className={`bottom-nav-label ${
+                  activeTab === item.id ? 'bottom-nav-label-active' : ''
+                }`}
+              >
+                {item.label}
+              </span>
+              {activeTab === item.id && (
+                <div className="bottom-nav-indicator" />
+              )}
+            </button>
           ))}
-        </View>
-
-        {/* Logout Button */}
-        <TouchableOpacity 
-          style={styles.logoutButton}
-          onPress={handleLogout}
-        >
-          <Text style={styles.logoutIcon}>🚪</Text>
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
-
-        <View style={styles.bottomPadding} />
-      </ScrollView>
-
-      {/* Bottom Navigation Bar */}
-      <View style={styles.navbar}>
-        {navItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.navItem}
-            onPress={() => setActiveTab(item.id)}
-            activeOpacity={0.7}
-          >
-            <View style={[
-              styles.navIconContainer,
-              activeTab === item.id && styles.navIconActive
-            ]}>
-              <Text style={[
-                styles.navIcon,
-                activeTab === item.id && styles.navIconTextActive
-              ]}>
-                {item.icon}
-              </Text>
-            </View>
-            <Text style={[
-              styles.navText,
-              activeTab === item.id && styles.navTextActive
-            ]}>
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+        </div>
+      </div>
+    </div>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerLogo: {
-    width: 50,
-    height: 50,
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.8,
-    marginTop: 2,
-  },
-  notificationBtn: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  notificationIcon: {
-    fontSize: 22,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FF4444',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginTop: 25,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#003366',
-    marginBottom: 15,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    width: (width - 55) / 2,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statContent: {
-    flex: 1,
-  },
-  statTitle: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 5,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#003366',
-  },
-  statIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconText: {
-    fontSize: 20,
-  },
-  menuGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  menuItem: {
-    width: (width - 55) / 3,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  menuIconContainer: {
-    width: 65,
-    height: 65,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  menuIcon: {
-    fontSize: 30,
-  },
-  menuTitle: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  activityCard: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  activityIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: '#4A90E2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  activityIconText: {
-    fontSize: 20,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 3,
-  },
-  activityTime: {
-    fontSize: 12,
-    color: '#999',
-  },
-  activityBtn: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#003366',
-  },
-  activityBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  logoutButton: {
-    backgroundColor: '#FF4444',
-    borderRadius: 15,
-    padding: 18,
-    marginHorizontal: 20,
-    marginTop: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  logoutIcon: {
-    fontSize: 20,
-    marginRight: 10,
-  },
-  logoutButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  bottomPadding: {
-    height: 20,
-  },
-  navbar: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingVertical: 10,
-    paddingBottom: 20,
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  navIconActive: {
-    backgroundColor: '#003366',
-  },
-  navIcon: {
-    fontSize: 22,
-  },
-  navIconTextActive: {
-    transform: [{ scale: 1.1 }],
-  },
-  navText: {
-    fontSize: 11,
-    color: '#666',
-    fontWeight: '500',
-  },
-  navTextActive: {
-    color: '#003366',
-    fontWeight: '700',
-  },
-});
-
-export default DashboardScreen;
+export default NeatWork;
