@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import './DashboardScreen.css';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type OrderStatus = 'mendatang' | 'berlangsung' | 'selesai';
 
@@ -19,6 +19,12 @@ const STATUS_TABS: { id: OrderStatus; label: string }[] = [
   { id: 'berlangsung', label: 'Berlangsung' },
   { id: 'selesai', label: 'Selesai' },
 ];
+
+const STATUS_BADGE_LABEL: Record<OrderStatus, string> = {
+  mendatang: 'Mendatang',
+  berlangsung: 'Sedang Berlangsung',
+  selesai: 'Selesai',
+};
 
 const ORDERS: Order[] = [
   {
@@ -53,18 +59,6 @@ const ORDERS: Order[] = [
   },
 ];
 
-const STATUS_BADGE_CLASS: Record<OrderStatus, string> = {
-  mendatang: 'order-badge-upcoming',
-  berlangsung: 'order-badge-progress',
-  selesai: 'order-badge-done',
-};
-
-const STATUS_BADGE_LABEL: Record<OrderStatus, string> = {
-  mendatang: 'Mendatang',
-  berlangsung: 'Sedang Berlangsung',
-  selesai: 'Selesai',
-};
-
 const PesananScreen = () => {
   const [activeStatus, setActiveStatus] = useState<OrderStatus>('mendatang');
 
@@ -73,88 +67,293 @@ const PesananScreen = () => {
     [activeStatus],
   );
 
-  return (
-    <div className="orders-screen">
-      <header className="orders-header">
-        <h1 className="orders-title">Pesanan</h1>
-        <p className="orders-subtitle">
-          Pantau semua aktivitas kebersihan Anda di satu tempat
-        </p>
-      </header>
+  const renderOrder = ({ item }: { item: Order }) => (
+    <View style={styles.orderCard}>
+      <View style={styles.orderHeader}>
+        <View style={styles.orderIconWrapper}>
+          <Text style={styles.orderIcon}>{item.icon}</Text>
+        </View>
+        <View style={styles.orderHeaderText}>
+          <Text style={styles.orderTitle}>{item.title}</Text>
+          <Text style={styles.orderId}>#{item.id}</Text>
+        </View>
+        <View
+          style={[
+            styles.orderBadge,
+            item.status === 'mendatang' && styles.orderBadge_mendatang,
+            item.status === 'berlangsung' && styles.orderBadge_berlangsung,
+            item.status === 'selesai' && styles.orderBadge_selesai,
+          ]}
+        >
+          <Text style={styles.orderBadgeText}>{STATUS_BADGE_LABEL[item.status]}</Text>
+        </View>
+      </View>
 
-      <div className="orders-tabs">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            className={`orders-tab ${activeStatus === tab.id ? 'orders-tab-active' : ''}`}
-            onClick={() => setActiveStatus(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <View style={styles.orderInfoRow}>
+        <View style={styles.orderInfoColumn}>
+          <Text style={styles.orderInfoLabel}>Jadwal</Text>
+          <Text style={styles.orderInfoValue}>{item.date}</Text>
+          <Text style={styles.orderInfoTime}>{item.time}</Text>
+        </View>
+        <View style={styles.orderInfoColumn}>
+          <Text style={styles.orderInfoLabel}>Petugas</Text>
+          <Text style={styles.orderInfoValue}>{item.helper}</Text>
+          <Text style={styles.orderInfoTime}>Gender sesuai pilihan</Text>
+        </View>
+      </View>
 
-      <div className="orders-list">
-        {filteredOrders.length === 0 ? (
-          <div className="orders-empty-state">
-            <span className="orders-empty-icon">🗓️</span>
-            <p className="orders-empty-title">Belum ada pesanan {STATUS_BADGE_LABEL[activeStatus]}</p>
-            <p className="orders-empty-text">
-              Pesanan yang {STATUS_BADGE_LABEL[activeStatus].toLowerCase()} akan muncul di sini.
-            </p>
-          </div>
+      <View style={styles.orderAddress}>
+        <Text style={styles.orderInfoLabel}>Alamat</Text>
+        <Text style={styles.orderInfoValue}>{item.address}</Text>
+      </View>
+
+      <View style={styles.orderActions}>
+        {item.status !== 'selesai' ? (
+          <>
+            <TouchableOpacity style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>Ubah Jadwal</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Lihat Detail</Text>
+            </TouchableOpacity>
+          </>
         ) : (
-          filteredOrders.map((order) => (
-            <div key={order.id} className="order-card">
-              <div className="order-card-header">
-                <div className="order-icon-wrapper">
-                  <span className="order-icon">{order.icon}</span>
-                </div>
-                <div className="order-header-text">
-                  <h3 className="order-title">{order.title}</h3>
-                  <p className="order-id">#{order.id}</p>
-                </div>
-                <span className={`order-badge ${STATUS_BADGE_CLASS[order.status]}`}>
-                  {STATUS_BADGE_LABEL[order.status]}
-                </span>
-              </div>
-
-              <div className="order-info-row">
-                <div>
-                  <p className="order-info-label">Jadwal</p>
-                  <p className="order-info-value">{order.date}</p>
-                  <p className="order-info-time">{order.time}</p>
-                </div>
-                <div>
-                  <p className="order-info-label">Petugas</p>
-                  <p className="order-info-value">{order.helper}</p>
-                  <p className="order-info-time">Gender sesuai pilihan</p>
-                </div>
-              </div>
-
-              <div className="order-address">
-                <p className="order-info-label">Alamat</p>
-                <p className="order-info-value">{order.address}</p>
-              </div>
-
-              <div className="order-actions">
-                {order.status !== 'selesai' ? (
-                  <>
-                    <button className="btn btn-outline order-btn">Ubah Jadwal</button>
-                    <button className="btn btn-primary order-btn">Lihat Detail</button>
-                  </>
-                ) : (
-                  <button className="btn btn-outline order-btn">Pesan Lagi</button>
-                )}
-              </div>
-            </div>
-          ))
+          <TouchableOpacity style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Pesan Lagi</Text>
+          </TouchableOpacity>
         )}
-      </div>
-    </div>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Pesanan</Text>
+        <Text style={styles.subtitle}>
+          Pantau semua aktivitas kebersihan Anda di satu tempat
+        </Text>
+      </View>
+
+      <View style={styles.tabs}>
+        {STATUS_TABS.map((tab) => (
+          <TouchableOpacity
+            key={tab.id}
+            style={[styles.tab, activeStatus === tab.id && styles.tabActive]}
+            onPress={() => setActiveStatus(tab.id)}
+          >
+            <Text
+              style={[styles.tabLabel, activeStatus === tab.id && styles.tabLabelActive]}
+            >
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {filteredOrders.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyEmoji}>🗓️</Text>
+          <Text style={styles.emptyTitle}>
+            Belum ada pesanan {STATUS_BADGE_LABEL[activeStatus]}
+          </Text>
+          <Text style={styles.emptyText}>
+            Pesanan yang {STATUS_BADGE_LABEL[activeStatus].toLowerCase()} akan muncul di sini.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredOrders}
+          keyExtractor={(order) => order.id}
+          renderItem={renderOrder}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+    </View>
   );
 };
 
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f6fa',
+    padding: 24,
+    gap: 16,
+  },
+  header: {
+    gap: 4,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0f1c2e',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6c7a93',
+  },
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: '#e4e8f2',
+    borderRadius: 30,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 26,
+  },
+  tabActive: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  tabLabel: {
+    fontSize: 14,
+    color: '#6c7a93',
+    fontWeight: '500',
+  },
+  tabLabelActive: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    gap: 8,
+  },
+  emptyEmoji: {
+    fontSize: 36,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0f1c2e',
+    textAlign: 'center',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#6c7a93',
+  },
+  orderCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+    gap: 16,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  orderIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#eef2ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  orderIcon: {
+    fontSize: 24,
+  },
+  orderHeaderText: {
+    flex: 1,
+  },
+  orderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0f1c2e',
+  },
+  orderId: {
+    color: '#6c7a93',
+  },
+  orderBadge: {
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  orderBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  orderBadge_mendatang: {
+    backgroundColor: '#f97316',
+  },
+  orderBadge_berlangsung: {
+    backgroundColor: '#2563eb',
+  },
+  orderBadge_selesai: {
+    backgroundColor: '#22c55e',
+  },
+  orderInfoRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  orderInfoColumn: {
+    flex: 1,
+    gap: 4,
+  },
+  orderInfoLabel: {
+    fontSize: 12,
+    color: '#6c7a93',
+  },
+  orderInfoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0f1c2e',
+  },
+  orderInfoTime: {
+    color: '#6c7a93',
+  },
+  orderAddress: {
+    backgroundColor: '#f5f6fa',
+    borderRadius: 16,
+    padding: 12,
+    gap: 4,
+  },
+  orderActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
+    backgroundColor: '#2563eb',
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d4d7dd',
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#0f1c2e',
+    fontWeight: '600',
+  },
+});
+
 export default PesananScreen;
-
-
