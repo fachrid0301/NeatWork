@@ -11,13 +11,15 @@ import {
   TextInput,
   Alert,
   Platform,
+  Linking,
 } from 'react-native';
 import { PermissionsAndroid } from 'react-native';
 import PesananScreen from './PesananScreen';
 import { listJenisService } from '../../services/jenisService.api';
-import { listBookings, createBooking } from '../../services/booking.api';
+import { createBooking } from '../../services/booking.api';
 import { listPromos } from '../../services/promo.api';
 import { getMe } from '../../services/user.api';
+import { getDashboardSummary } from '../../services/dashboard.api';
 import { reverseGeocode, searchAddress } from '../../services/geocode.api';
 
 // Avoid importing react-native-maps on web (it breaks due to codegen incompatibility)
@@ -48,60 +50,6 @@ type Service = {
 
 const WINDOW_WIDTH = Dimensions.get('window').width;
 
-const PROMO_SLIDES: PromoSlide[] = [
-  {
-    title: 'Cukup Klik Klik Klik',
-    subtitle: 'Rumah Rapi & Resik',
-    discount: '15%',
-    code: 'MIDWEEKDEALNOV',
-    period: 'Periode: 10 - 24 November 2025',
-    emoji: '🏠✨',
-  },
-  {
-    title: 'Promo Akhir Tahun',
-    subtitle: 'Bersih Total!',
-    discount: '20%',
-    code: 'NEWYEAR2025',
-    period: 'Periode: 1 - 31 Desember 2025',
-    emoji: '🎉🎊',
-  },
-  {
-    title: 'Weekend Special',
-    subtitle: 'Santai, Rumah Bersih',
-    discount: '10%',
-    code: 'WEEKEND2025',
-    period: 'Setiap Sabtu & Minggu',
-    emoji: '🌟💫',
-  },
-];
-
-const SERVICES: Service[] = [
-  {
-    id: 1,
-    title: 'ART (per jam)',
-    description: 'Pembersihan umum, asisten rumahan (alatmu)',
-    price: '40rb/jam',
-    image: '🧹',
-    route: 'art-service',
-  },
-  {
-    id: 2,
-    title: 'Deep Cleaning',
-    description: 'Cleaning bergaransi kualitas dengan alat lengkap',
-    price: '80rb/jam',
-    image: '✨',
-    route: 'deep-cleaning',
-  },
-  {
-    id: 3,
-    title: 'Subscription & Ticket',
-    description: 'Langganan pembersihan rumah',
-    image: '🎫',
-    badge: 'Popular',
-    route: 'subscription',
-  },
-];
-
 const PROFILE_MENU = [
   { icon: '📋', label: 'Riwayat Pesanan' },
   { icon: '🏡', label: 'Alamat Favorit' },
@@ -113,9 +61,10 @@ const DashboardScreen = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda');
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentPage, setCurrentPage] = useState<'home' | string>('home');
-  const [services, setServices] = useState<Service[]>(SERVICES);
+  const [services, setServices] = useState<Service[]>([]);
   const [promoSlides, setPromoSlides] = useState<PromoSlide[]>([]);
-  const [userName, setUserName] = useState<string>('Asep');
+  const [userName, setUserName] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
   const [activeOrderCount, setActiveOrderCount] = useState<number>(0);
   const [nextSchedule, setNextSchedule] = useState<string>('—');
 
@@ -178,7 +127,10 @@ const DashboardScreen = () => {
       try {
         const me = await getMe();
         const nama = (me?.nama || me?.name || '').toString();
-        if (mounted && nama) setUserName(nama);
+        const email = (me?.email || '').toString();
+        if (!mounted) return;
+        if (nama) setUserName(nama);
+        if (email) setUserEmail(email);
       } catch (_) {}
     })();
     return () => {
@@ -186,30 +138,16 @@ const DashboardScreen = () => {
     };
   }, []);
 
-  // Fetch bookings to populate hero stats
+  // Fetch dashboard summary (active_count, next_schedule)
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const data = await listBookings();
-        const arr: any[] = Array.isArray((data as any)) ? (data as any) : [];
-        const parseDate = (d?: string) => (d ? new Date(d) : null);
-        const now = new Date();
-        const upcoming = arr
-          .map((b) => ({
-            status: String(b.status || '').toLowerCase(),
-            date: parseDate(b.scheduled_date || b.date),
-          }))
-          .filter((x) => x.date instanceof Date && !isNaN((x.date as Date).getTime()));
-
-        const active = upcoming.filter((x) => x.status !== 'selesai');
-        const next = active
-          .map((x) => x.date as Date)
-          .filter((d) => d >= now)
-          .sort((a, b) => a.getTime() - b.getTime())[0];
-
+        const data = await getDashboardSummary();
         if (!mounted) return;
-        setActiveOrderCount(active.length);
+        const active = Number(data?.active_count ?? 0);
+        const next = data?.next_schedule ? new Date(data.next_schedule) : null;
+        setActiveOrderCount(Number.isFinite(active) ? active : 0);
         setNextSchedule(next ? next.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) : '—');
       } catch (_) {
         if (!mounted) return;
@@ -297,76 +235,68 @@ const DashboardScreen = () => {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Promo Spesial</Text>
-          <Text style={styles.sectionMeta}>
-            {currentSlide + 1}/{PROMO_SLIDES.length}
-          </Text>
-        </View>
-        <FlatList
-          ref={(ref) => {
-            sliderRef.current = ref;
-          }}
-          data={promoSlides.length ? promoSlides : PROMO_SLIDES}
-          keyExtractor={(item) => item.code}
-          renderItem={renderPromoItem}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          pagingEnabled
-          snapToAlignment="center"
-          decelerationRate="fast"
-          onMomentumScrollEnd={(event) => {
-            const index = Math.round(
-              event.nativeEvent.contentOffset.x / (WINDOW_WIDTH - 48),
-            );
-            setCurrentSlide(index);
-          }}
-          contentContainerStyle={styles.sliderContent}
-        />
-        <View style={styles.sliderDots}>
-          {(promoSlides.length ? promoSlides : PROMO_SLIDES).map((promo, index) => (
-            <View
-              key={promo.code}
-              style={[
-                styles.sliderDot,
-                currentSlide === index && styles.sliderDotActive,
-              ]}
-            />
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Layanan Populer</Text>
-          <Text style={styles.sectionMeta}>Pilih kebutuhanmu</Text>
-        </View>
-        <FlatList
-          data={services && services.length ? services : SERVICES}
-          keyExtractor={(item) => item.id.toString()}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          renderItem={renderServiceCard}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={false}
-        />
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Catatan Pemakaian</Text>
-          <Text style={styles.sectionMeta}>Rata-rata 50.7 KB/d</Text>
-        </View>
-        <View style={[styles.card, styles.usageCard]}>
-          <View>
-            <Text style={styles.usageLabel}>Total Estimasi</Text>
-            <Text style={styles.usageValue}>Rp 80.000</Text>
+      {promoSlides.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Promo Spesial</Text>
+            <Text style={styles.sectionMeta}>
+              {currentSlide + 1}/{promoSlides.length}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Konfirmasi Pesanan</Text>
-          </TouchableOpacity>
+          <FlatList
+            ref={(ref) => {
+              sliderRef.current = ref;
+            }}
+            data={promoSlides}
+            keyExtractor={(item) => item.code}
+            renderItem={renderPromoItem}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            pagingEnabled
+            snapToAlignment="center"
+            decelerationRate="fast"
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(
+                event.nativeEvent.contentOffset.x / (WINDOW_WIDTH - 48),
+              );
+              setCurrentSlide(index);
+            }}
+            contentContainerStyle={styles.sliderContent}
+          />
+          <View style={styles.sliderDots}>
+            {promoSlides.map((promo, index) => (
+              <View
+                key={promo.code}
+                style={[
+                  styles.sliderDot,
+                  currentSlide === index && styles.sliderDotActive,
+                ]}
+              />
+            ))}
+          </View>
         </View>
+      )}
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Layanan</Text>
+          <Text style={styles.sectionMeta}>{services.length} tersedia</Text>
+        </View>
+        {services.length > 0 ? (
+          <FlatList
+            data={services}
+            keyExtractor={(item) => item.id.toString()}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            renderItem={renderServiceCard}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={false}
+          />
+        ) : (
+          <Text style={{ color: '#6c7a93' }}>Belum ada layanan.</Text>
+        )}
       </View>
+
+      {/* removed dummy usage section */}
     </ScrollView>
   );
 
@@ -438,6 +368,8 @@ const DashboardScreen = () => {
           preferred_gender: preferredGender,
           people_count: Number(peopleCount),
           catatan: catatan || undefined,
+          latitude: markerCoord?.latitude,
+          longitude: markerCoord?.longitude,
         } as any;
         await createBooking(payload);
         Alert.alert('Sukses', 'Pemesanan berhasil dibuat');
@@ -668,9 +600,7 @@ const DashboardScreen = () => {
                       const lat = markerCoord?.latitude ?? region.latitude;
                       const lon = markerCoord?.longitude ?? region.longitude;
                       const url = `https://www.openstreetmap.org/#map=16/${lat}/${lon}`;
-                      if (typeof window !== 'undefined') {
-                        (window as any).open(url, '_blank');
-                      }
+                      Linking.openURL(url).catch(() => {});
                     }}
                     style={{ height: 260, borderRadius: 12, overflow: 'hidden' }}
                   >
@@ -775,20 +705,24 @@ const DashboardScreen = () => {
         <Text style={styles.sectionTitle}>Promo & Penawaran</Text>
         <Text style={styles.sectionMeta}>Update mingguan</Text>
       </View>
-      {PROMO_SLIDES.map((promo) => (
-        <View key={promo.code} style={[styles.card, styles.promoListCard]}>
-          <Text style={styles.promoDiscountBadge}>{promo.discount}</Text>
-          <Text style={styles.promoTitle}>{promo.title}</Text>
-          <Text style={styles.promoSubtitle}>{promo.subtitle}</Text>
-          <Text style={styles.promoCode}>
-            Gunakan kode <Text style={styles.promoCodeHighlight}>{promo.code}</Text>
-          </Text>
-          <Text style={styles.promoPeriod}>{promo.period}</Text>
-          <TouchableOpacity style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Gunakan Promo</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
+      {promoSlides.length > 0 ? (
+        promoSlides.map((promo: PromoSlide) => (
+          <View key={promo.code} style={[styles.card, styles.promoListCard]}>
+            <Text style={styles.promoDiscountBadge}>{promo.discount}</Text>
+            <Text style={styles.promoTitle}>{promo.title}</Text>
+            <Text style={styles.promoSubtitle}>{promo.subtitle}</Text>
+            <Text style={styles.promoCode}>
+              Gunakan kode <Text style={styles.promoCodeHighlight}>{promo.code}</Text>
+            </Text>
+            <Text style={styles.promoPeriod}>{promo.period}</Text>
+            <TouchableOpacity style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>Gunakan Promo</Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      ) : (
+        <Text style={{ color: '#6c7a93' }}>Belum ada promo.</Text>
+      )}
     </ScrollView>
   );
 
@@ -802,8 +736,8 @@ const DashboardScreen = () => {
           <Text style={styles.profileAvatarText}>👤</Text>
         </View>
         <View>
-          <Text style={styles.profileName}>Asep Nusrulah</Text>
-          <Text style={styles.profileEmail}>asep@gmail.com</Text>
+          <Text style={styles.profileName}>{userName || 'Pengguna'}</Text>
+          {!!userEmail && <Text style={styles.profileEmail}>{userEmail}</Text>}
         </View>
         <TouchableOpacity style={styles.secondaryButton}>
           <Text style={styles.secondaryButtonText}>Edit Profil</Text>
@@ -823,11 +757,7 @@ const DashboardScreen = () => {
   );
 
   const currentService = useMemo(
-    () => {
-      const fromDynamic = services.find((s) => s.route === currentPage);
-      if (fromDynamic) return fromDynamic;
-      return SERVICES.find((service) => service.route === currentPage);
-    },
+    () => services.find((s: Service) => s.route === currentPage),
     [currentPage, services],
   );
 
