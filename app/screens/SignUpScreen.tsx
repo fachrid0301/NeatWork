@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
@@ -27,6 +28,8 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
   const handleSignUp = async (): Promise<void> => {
     // Validasi input
@@ -130,29 +133,53 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
               autoCapitalize="none"
             />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setError(''); // Clear error saat user mengetik
-              }}
-              secureTextEntry
-            />
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password"
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setError('');
+                }}
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={() => setShowPassword((prev) => !prev)}
+              >
+                <Feather
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color="#003366"
+                />
+              </TouchableOpacity>
+            </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm Password"
-              placeholderTextColor="#999"
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                setError(''); // Clear error saat user mengetik
-              }}
-              secureTextEntry
-            />
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Confirm Password"
+                placeholderTextColor="#999"
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  setError('');
+                }}
+                secureTextEntry={!showConfirmPassword}
+              />
+              <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={() => setShowConfirmPassword((prev) => !prev)}
+              >
+                <Feather
+                  name={showConfirmPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color="#003366"
+                />
+              </TouchableOpacity>
+            </View>
 
             {error ? (
               <View style={styles.errorContainer}>
@@ -248,6 +275,23 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 16,
     color: '#333',
+  },
+  passwordWrapper: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 15,
+  },
+  passwordToggle: {
+    paddingLeft: 12,
   },
   continueButton: {
     backgroundColor: '#D4A574',
