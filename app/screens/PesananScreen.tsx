@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import './DashboardScreen.css';
 import { listBookings } from '../../services/booking.api';
-import React, { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type OrderStatus = 'mendatang' | 'berlangsung' | 'selesai';
