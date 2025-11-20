@@ -8,11 +8,33 @@ import {
   TouchableOpacity,
   View,
   Image,
+  TextInput,
+  Alert,
+  Platform,
 } from 'react-native';
+import { PermissionsAndroid } from 'react-native';
 import PesananScreen from './PesananScreen';
 import { listJenisService } from '../../services/jenisService.api';
+import { listBookings, createBooking } from '../../services/booking.api';
+import { listPromos } from '../../services/promo.api';
+import { getMe } from '../../services/user.api';
+import { reverseGeocode, searchAddress } from '../../services/geocode.api';
+
+// Avoid importing react-native-maps on web (it breaks due to codegen incompatibility)
+const isWeb = Platform.OS === 'web';
+const RNMaps = !isWeb ? require('react-native-maps') : null as any;
 
 type ActiveTab = 'beranda' | 'pesanan' | 'promosi' | 'profil';
+
+type PromoSlide = {
+  title: string;
+  subtitle?: string;
+  discount?: string;
+  code: string;
+  period?: string;
+  emoji?: string;
+  image_url?: string;
+};
 
 type Service = {
   id: number;
@@ -26,7 +48,7 @@ type Service = {
 
 const WINDOW_WIDTH = Dimensions.get('window').width;
 
-const PROMO_SLIDES = [
+const PROMO_SLIDES: PromoSlide[] = [
   {
     title: 'Cukup Klik Klik Klik',
     subtitle: 'Rumah Rapi & Resik',
@@ -92,8 +114,12 @@ const DashboardScreen = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentPage, setCurrentPage] = useState<'home' | string>('home');
   const [services, setServices] = useState<Service[]>(SERVICES);
+  const [promoSlides, setPromoSlides] = useState<PromoSlide[]>([]);
+  const [userName, setUserName] = useState<string>('Asep');
+  const [activeOrderCount, setActiveOrderCount] = useState<number>(0);
+  const [nextSchedule, setNextSchedule] = useState<string>('—');
 
-  const sliderRef = useRef<FlatList<typeof PROMO_SLIDES[number]> | null>(null);
+  const sliderRef = useRef<FlatList<PromoSlide> | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -121,6 +147,81 @@ const DashboardScreen = () => {
     };
   }, []);
 
+  // Fetch promos for banner
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await listPromos();
+        const arr: any[] = Array.isArray((data as any)) ? (data as any) : (Array.isArray((data as any)?.data) ? (data as any).data : []);
+        const mapped: PromoSlide[] = arr.map((p: any) => ({
+          title: String(p.title ?? ''),
+          subtitle: p.subtitle ? String(p.subtitle) : undefined,
+          discount: p.discount ? String(p.discount) : undefined,
+          code: String(p.code ?? ''),
+          period: p.period ? String(p.period) : undefined,
+          emoji: p.emoji ? String(p.emoji) : undefined,
+          image_url: p.image_url ? String(p.image_url) : undefined,
+        })).filter((x) => x.code && x.title);
+        if (mounted && mapped.length) setPromoSlides(mapped);
+      } catch (_) {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Fetch current user for greeting
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const me = await getMe();
+        const nama = (me?.nama || me?.name || '').toString();
+        if (mounted && nama) setUserName(nama);
+      } catch (_) {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Fetch bookings to populate hero stats
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await listBookings();
+        const arr: any[] = Array.isArray((data as any)) ? (data as any) : [];
+        const parseDate = (d?: string) => (d ? new Date(d) : null);
+        const now = new Date();
+        const upcoming = arr
+          .map((b) => ({
+            status: String(b.status || '').toLowerCase(),
+            date: parseDate(b.scheduled_date || b.date),
+          }))
+          .filter((x) => x.date instanceof Date && !isNaN((x.date as Date).getTime()));
+
+        const active = upcoming.filter((x) => x.status !== 'selesai');
+        const next = active
+          .map((x) => x.date as Date)
+          .filter((d) => d >= now)
+          .sort((a, b) => a.getTime() - b.getTime())[0];
+
+        if (!mounted) return;
+        setActiveOrderCount(active.length);
+        setNextSchedule(next ? next.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) : '—');
+      } catch (_) {
+        if (!mounted) return;
+        setActiveOrderCount(0);
+        setNextSchedule('—');
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const handleOrderService = (service: Service) => {
     setCurrentPage(service.route);
     setActiveTab('beranda');
@@ -134,11 +235,11 @@ const DashboardScreen = () => {
   const renderPromoItem = ({
     item,
   }: {
-    item: (typeof PROMO_SLIDES)[number];
+    item: PromoSlide;
   }) => (
     <View style={[styles.card, styles.promoCard, { width: WINDOW_WIDTH - 48 }]}>
       <View style={styles.promoHeader}>
-        <Text style={styles.promoEmoji}>{item.emoji}</Text>
+        <Text style={styles.promoEmoji}>{item.emoji ?? '✨'}</Text>
         <Text style={styles.promoDiscount}>{item.discount}</Text>
       </View>
       <Text style={styles.promoTitle}>{item.title}</Text>
@@ -182,16 +283,16 @@ const DashboardScreen = () => {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.heroCard}>
-        <Text style={styles.heroGreeting}>Halo, Asep 👋</Text>
+        <Text style={styles.heroGreeting}>Halo, {userName} 👋</Text>
         <Text style={styles.heroSubtitle}>Lanjutkan aktivitas kebersihanmu</Text>
         <View style={styles.heroStatRow}>
           <View style={styles.heroStat}>
             <Text style={styles.heroStatLabel}>Pesanan Aktif</Text>
-            <Text style={styles.heroStatValue}>2</Text>
+            <Text style={styles.heroStatValue}>{activeOrderCount}</Text>
           </View>
           <View style={styles.heroStat}>
             <Text style={styles.heroStatLabel}>Jadwal Terdekat</Text>
-            <Text style={styles.heroStatValue}>19 Nov</Text>
+            <Text style={styles.heroStatValue}>{nextSchedule}</Text>
           </View>
         </View>
       </View>
@@ -207,7 +308,7 @@ const DashboardScreen = () => {
           ref={(ref) => {
             sliderRef.current = ref;
           }}
-          data={PROMO_SLIDES}
+          data={promoSlides.length ? promoSlides : PROMO_SLIDES}
           keyExtractor={(item) => item.code}
           renderItem={renderPromoItem}
           horizontal
@@ -224,7 +325,7 @@ const DashboardScreen = () => {
           contentContainerStyle={styles.sliderContent}
         />
         <View style={styles.sliderDots}>
-          {PROMO_SLIDES.map((promo, index) => (
+          {(promoSlides.length ? promoSlides : PROMO_SLIDES).map((promo, index) => (
             <View
               key={promo.code}
               style={[
@@ -269,42 +370,401 @@ const DashboardScreen = () => {
     </ScrollView>
   );
 
-  const ServiceDetailPage = ({ service }: { service: Service }) => (
-    <ScrollView
-      contentContainerStyle={styles.detailContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity style={styles.backButton} onPress={handleBackToHome}>
-        <Text style={styles.backButtonIcon}>←</Text>
-        <Text style={styles.backButtonText}>Kembali</Text>
-      </TouchableOpacity>
+  const ServiceDetailPage = ({ service }: { service: Service }) => {
+    const [alamat, setAlamat] = useState('');
+    const [serviceDate, setServiceDate] = useState(''); // YYYY-MM-DD
+    const [serviceTime, setServiceTime] = useState(''); // HH:MM
+    const [duration, setDuration] = useState('2');
+    const [preferredGender, setPreferredGender] = useState<'any' | 'male' | 'female'>('any');
+    const [peopleCount, setPeopleCount] = useState('1');
+    const [catatan, setCatatan] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [showMapPicker, setShowMapPicker] = useState(false);
+    const [markerCoord, setMarkerCoord] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [region, setRegion] = useState({
+      latitude: -6.200000, // Jakarta default
+      longitude: 106.816666,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    });
+    const [favorites, setFavorites] = useState<{ label: string; address: string }[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<{ display_name: string; lat?: string; lon?: string }[]>([]);
 
-      <View style={[styles.card, styles.detailHeaderCard]}>
-        <Text style={styles.detailEmoji}>{service.image}</Text>
-        <Text style={styles.detailTitle}>{service.title}</Text>
-        {service.price ? (
-          <Text style={styles.detailPrice}>{service.price}</Text>
-        ) : null}
-        <Text style={styles.detailDescription}>{service.description}</Text>
-      </View>
+    const getCurrentLocation = async (onLocated?: (lat: number, lon: number) => void) => {
+      try {
+        if (Platform.OS === 'android') {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert('Izin lokasi ditolak');
+            return;
+          }
+        }
+        const geo = (navigator as any).geolocation || (global as any).navigator?.geolocation;
+        if (!geo) {
+          Alert.alert('Lokasi tidak didukung');
+          return;
+        }
+        geo.getCurrentPosition(
+          (pos: any) => {
+            const { latitude, longitude } = pos.coords || {};
+            if (latitude && longitude) {
+              onLocated?.(latitude, longitude);
+            }
+          },
+          (err: any) => Alert.alert('Gagal mengambil lokasi', String(err?.message || 'Unknown')),
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+        );
+      } catch (e: any) {
+        Alert.alert('Gagal', String(e?.message || e));
+      }
+    };
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Keunggulan</Text>
-        {['Tenaga profesional', 'Garansi 100%', 'Booking cepat', 'Pembayaran fleksibel'].map(
-          (item) => (
-            <View key={item} style={styles.detailListItem}>
-              <Text style={styles.detailListIcon}>✅</Text>
-              <Text style={styles.detailListText}>{item}</Text>
+    const submitBooking = async () => {
+      try {
+        if (!alamat || !serviceDate || !serviceTime || !duration || !peopleCount) {
+          Alert.alert('Lengkapi Data', 'Mohon isi semua kolom yang wajib.');
+          return;
+        }
+        setSubmitting(true);
+        const payload = {
+          jenis_service_id: service.id,
+          alamat,
+          service_date: serviceDate,
+          service_time: serviceTime,
+          duration: Number(duration),
+          preferred_gender: preferredGender,
+          people_count: Number(peopleCount),
+          catatan: catatan || undefined,
+        } as any;
+        await createBooking(payload);
+        Alert.alert('Sukses', 'Pemesanan berhasil dibuat');
+        setCurrentPage('home');
+        setActiveTab('pesanan');
+      } catch (e: any) {
+        const msg = e?.response?.data?.message || 'Gagal membuat pemesanan';
+        Alert.alert('Gagal', String(msg));
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    return (
+      <ScrollView
+        contentContainerStyle={styles.detailContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <TouchableOpacity style={styles.backButton} onPress={handleBackToHome}>
+          <Text style={styles.backButtonIcon}>←</Text>
+          <Text style={styles.backButtonText}>Kembali</Text>
+        </TouchableOpacity>
+
+        <View style={[styles.card, styles.detailHeaderCard]}>
+          <Text style={styles.detailEmoji}>{service.image}</Text>
+          <Text style={styles.detailTitle}>{service.title}</Text>
+          {service.price ? (
+            <Text style={styles.detailPrice}>{service.price}</Text>
+          ) : null}
+          <Text style={styles.detailDescription}>{service.description}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Form Pemesanan</Text>
+          <View style={{ gap: 12 }}>
+            <View>
+              <Text style={styles.inputLabel}>Alamat</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Alamat lengkap"
+                value={alamat}
+                onChangeText={setAlamat}
+                multiline
+              />
+              <TouchableOpacity style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => setShowMapPicker(true)}>
+                <Text style={styles.secondaryButtonText}>Pilih dari Peta</Text>
+              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[styles.secondaryButton, { flex: 1 }]}
+                  onPress={() =>
+                    getCurrentLocation(async (lat, lon) => {
+                      try {
+                        const res = await reverseGeocode(lat, lon);
+                        if (res?.address) setAlamat(res.address);
+                        setRegion((r) => ({ ...r, latitude: lat, longitude: lon }));
+                        setMarkerCoord({ latitude: lat, longitude: lon });
+                      } catch (e) {
+                        Alert.alert('Gagal', 'Tidak bisa reverse geocode lokasi saat ini');
+                      }
+                    })
+                  }
+                >
+                  <Text style={styles.secondaryButtonText}>Lokasi Saat Ini</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.secondaryButton, { flex: 1 }]}
+                  onPress={() => {
+                    if (!alamat) {
+                      Alert.alert('Alamat kosong', 'Isi alamat terlebih dahulu');
+                      return;
+                    }
+                    const label = `Favorit ${favorites.length + 1}`;
+                    setFavorites((prev) => [...prev, { label, address: alamat }]);
+                    Alert.alert('Tersimpan', `Alamat disimpan sebagai ${label}`);
+                  }}
+                >
+                  <Text style={styles.secondaryButtonText}>Simpan ke Favorit</Text>
+                </TouchableOpacity>
+              </View>
+              {favorites.length ? (
+                <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {favorites.map((fav, idx) => (
+                    <TouchableOpacity
+                      key={fav.label + idx}
+                      style={styles.chip}
+                      onPress={() => setAlamat(fav.address)}
+                      onLongPress={() => setFavorites((prev) => prev.filter((_, i) => i !== idx))}
+                    >
+                      <Text style={styles.chipText}>{fav.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
             </View>
-          ),
-        )}
-      </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Tanggal</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="YYYY-MM-DD"
+                  value={serviceDate}
+                  onChangeText={setServiceDate}
+                />
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                  <TouchableOpacity
+                    style={styles.chip}
+                    onPress={() => setServiceDate(new Date().toISOString().slice(0, 10))}
+                  >
+                    <Text style={styles.chipText}>Hari ini</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.chip}
+                    onPress={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 1);
+                      setServiceDate(d.toISOString().slice(0, 10));
+                    }}
+                  >
+                    <Text style={styles.chipText}>Besok</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Jam</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="HH:MM"
+                  value={serviceTime}
+                  onChangeText={setServiceTime}
+                />
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                  {['09:00', '13:00', '16:00', '19:00'].map((t) => (
+                    <TouchableOpacity key={t} style={styles.chip} onPress={() => setServiceTime(t)}>
+                      <Text style={styles.chipText}>{t}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Durasi (jam)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="2"
+                  keyboardType="numeric"
+                  value={duration}
+                  onChangeText={setDuration}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Jumlah Petugas</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="1"
+                  keyboardType="numeric"
+                  value={peopleCount}
+                  onChangeText={setPeopleCount}
+                />
+              </View>
+            </View>
+            <View>
+              <Text style={styles.inputLabel}>Preferensi Gender (any/male/female)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="any"
+                autoCapitalize="none"
+                value={preferredGender}
+                onChangeText={(t) => {
+                  const v = (t || '').toLowerCase();
+                  if (v === 'male' || v === 'female' || v === 'any') setPreferredGender(v as any);
+                }}
+              />
+            </View>
+            <View>
+              <Text style={styles.inputLabel}>Catatan (opsional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Tambahan informasi"
+                value={catatan}
+                onChangeText={setCatatan}
+                multiline
+              />
+            </View>
+          </View>
+        </View>
 
-      <TouchableOpacity style={styles.primaryButton}>
-        <Text style={styles.primaryButtonText}>Pesan Layanan</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
+        <TouchableOpacity style={styles.primaryButton} onPress={submitBooking} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>{submitting ? 'Memesan...' : 'Pesan Layanan'}</Text>
+        </TouchableOpacity>
+
+        {showMapPicker && (
+          <View style={styles.mapModalOverlay}>
+            <View style={styles.mapModalCard}>
+              <View style={styles.mapHeader}>
+                <Text style={styles.sectionTitle}>Pilih Lokasi</Text>
+                <TouchableOpacity onPress={() => setShowMapPicker(false)}>
+                  <Text style={styles.backButtonText}>Tutup</Text>
+                </TouchableOpacity>
+              </View>
+              {isWeb ? (
+                <View style={{ gap: 8, flex: 1 }}>
+                  <Text style={styles.inputLabel}>Cari alamat (OSM)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Mis. Monas, Jakarta"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    onPress={async () => {
+                      if (!searchQuery) return;
+                      try {
+                        const data = await searchAddress(searchQuery);
+                        setSearchResults(Array.isArray(data) ? data : []);
+                      } catch (e) {
+                        Alert.alert('Gagal', 'Tidak bisa mencari alamat');
+                      }
+                    }}
+                  >
+                    <Text style={styles.secondaryButtonText}>Cari</Text>
+                  </TouchableOpacity>
+                  {/* Static OSM map preview (click opens OSM site in new tab) */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      const lat = markerCoord?.latitude ?? region.latitude;
+                      const lon = markerCoord?.longitude ?? region.longitude;
+                      const url = `https://www.openstreetmap.org/#map=16/${lat}/${lon}`;
+                      if (typeof window !== 'undefined') {
+                        (window as any).open(url, '_blank');
+                      }
+                    }}
+                    style={{ height: 260, borderRadius: 12, overflow: 'hidden' }}
+                  >
+                    <Image
+                      source={{
+                        uri: `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(
+                          String(markerCoord?.latitude ?? region.latitude),
+                        )},${encodeURIComponent(String(markerCoord?.longitude ?? region.longitude))}&zoom=14&size=600x300&markers=${encodeURIComponent(
+                          markerCoord ? `${markerCoord.latitude},${markerCoord.longitude},red` : `${region.latitude},${region.longitude},lightblue`
+                        )}`,
+                      }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                  <ScrollView style={{ flex: 1 }}>
+                    {searchResults.map((it, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' }}
+                        onPress={() => {
+                          const lat = Number((it as any).lat);
+                          const lon = Number((it as any).lon);
+                          if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+                            setMarkerCoord({ latitude: lat, longitude: lon });
+                            setRegion((r) => ({ ...r, latitude: lat, longitude: lon }));
+                          }
+                          setAlamat((it as any).display_name);
+                          setShowMapPicker(false);
+                        }}
+                      >
+                        <Text style={{ color: '#0f1c2e' }}>{(it as any).display_name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : (
+                <>
+                  <RNMaps.MapView
+                    style={styles.map}
+                    initialRegion={region}
+                    onRegionChangeComplete={(r: any) => setRegion(r)}
+                    onLongPress={(e: any) => {
+                      const { latitude, longitude } = e.nativeEvent.coordinate;
+                      setMarkerCoord({ latitude, longitude });
+                    }}
+                  >
+                    <RNMaps.UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+                    {markerCoord ? (
+                      <RNMaps.Marker coordinate={markerCoord} draggable onDragEnd={(e: any) => setMarkerCoord(e.nativeEvent.coordinate)} />
+                    ) : null}
+                  </RNMaps.MapView>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={() => setMarkerCoord(null)}>
+                      <Text style={styles.secondaryButtonText}>Reset Marker</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.secondaryButton, { flex: 1 }]}
+                      onPress={() =>
+                        getCurrentLocation((lat, lon) => {
+                          setMarkerCoord({ latitude: lat, longitude: lon });
+                          setRegion((r) => ({ ...r, latitude: lat, longitude: lon }));
+                        })
+                      }
+                    >
+                      <Text style={styles.secondaryButtonText}>Lokasi Saat Ini</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.primaryButton, { flex: 1 }]}
+                      onPress={async () => {
+                        if (!markerCoord) {
+                          Alert.alert('Pilih Lokasi', 'Tekan lama pada peta untuk memilih lokasi.');
+                          return;
+                        }
+                        try {
+                          const res = await reverseGeocode(markerCoord.latitude, markerCoord.longitude);
+                          if (res?.address) setAlamat(res.address);
+                          setShowMapPicker(false);
+                        } catch (err) {
+                          Alert.alert('Gagal', 'Tidak dapat mendapatkan alamat dari lokasi');
+                        }
+                      }}
+                    >
+                      <Text style={styles.primaryButtonText}>Gunakan Lokasi Ini</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
 
   const PromoScreen = () => (
     <ScrollView
@@ -363,8 +823,12 @@ const DashboardScreen = () => {
   );
 
   const currentService = useMemo(
-    () => SERVICES.find((service) => service.route === currentPage),
-    [currentPage],
+    () => {
+      const fromDynamic = services.find((s) => s.route === currentPage);
+      if (fromDynamic) return fromDynamic;
+      return SERVICES.find((service) => service.route === currentPage);
+    },
+    [currentPage, services],
   );
 
   const renderMainView = () => {
@@ -718,6 +1182,21 @@ const styles = StyleSheet.create({
   promoListCard: {
     gap: 8,
   },
+  inputLabel: {
+    fontSize: 13,
+    color: '#6c7a93',
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#0f1c2e',
+    minHeight: 44,
+  },
   promoDiscountBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#fee2e2',
@@ -811,6 +1290,48 @@ const styles = StyleSheet.create({
   },
   bottomNavLabelActive: {
     color: '#2563eb',
+    fontWeight: '600',
+  },
+  mapModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  mapModalCard: {
+    width: '100%',
+    height: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
+    gap: 12,
+  },
+  mapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  map: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+  },
+  chipText: {
+    color: '#0f1c2e',
+    fontSize: 12,
     fontWeight: '600',
   },
 });
