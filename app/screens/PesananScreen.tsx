@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './DashboardScreen.css';
+import { listBookings } from '../../services/booking.api';
 
 type OrderStatus = 'mendatang' | 'berlangsung' | 'selesai';
 
@@ -67,10 +68,38 @@ const STATUS_BADGE_LABEL: Record<OrderStatus, string> = {
 
 const PesananScreen = () => {
   const [activeStatus, setActiveStatus] = useState<OrderStatus>('mendatang');
+  const [orders, setOrders] = useState<Order[]>(ORDERS);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await listBookings();
+        const arr = Array.isArray(data) ? data : [];
+        const mapped: Order[] = arr.map((b: any, idx: number) => ({
+          id: String(b.id ?? idx + 1),
+          title: String(b.title ?? b.service_name ?? 'Pesanan'),
+          date: String(b.date ?? b.scheduled_date ?? ''),
+          time: String(b.time ?? b.scheduled_time ?? ''),
+          status: (['mendatang', 'berlangsung', 'selesai'].includes(b.status) ? b.status : 'mendatang') as OrderStatus,
+          address: String(b.address ?? b.lokasi ?? ''),
+          icon: '🧹',
+          helper: String(b.staff_name ?? 'Tim'),
+        })).filter((o) => !!o.id);
+        if (mounted && mapped.length) {
+          setOrders(mapped);
+        }
+      } catch (_) {
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredOrders = useMemo(
-    () => ORDERS.filter((order) => order.status === activeStatus),
-    [activeStatus],
+    () => orders.filter((order) => order.status === activeStatus),
+    [activeStatus, orders],
   );
 
   return (

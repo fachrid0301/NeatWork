@@ -141,7 +141,6 @@ const removeToken = async () => {
   }
 };
 
-// HTTP Client menggunakan fetch API
 class HttpClient {
   constructor(baseURL) {
     this.baseURL = baseURL;
@@ -149,8 +148,7 @@ class HttpClient {
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
-    
-    // Get token untuk request yang memerlukan autentikasi
+  
     const token = await getToken();
     
     const defaultHeaders = {
@@ -171,7 +169,7 @@ class HttpClient {
       },
     };
 
-    // Jika ada body, stringify
+
     if (config.body && typeof config.body === 'object') {
       config.body = JSON.stringify(config.body);
     }

@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './DashboardScreen.css';
 import PesananScreen from './PesananScreen';
+import { createBooking } from '../../services/booking.api';
+import { listJenisService } from '../../services/jenisService.api';
 
 type Service = {
   id: number;
   title: string;
   description: string;
   price?: string;
-  image: string;
+  image: string; // URL or emoji
   bgColor: string;
   badge?: string;
   route: string;
@@ -17,6 +19,7 @@ const NeatWork = () => {
   const [activeTab, setActiveTab] = useState('beranda');
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentPage, setCurrentPage] = useState('home');
+  const [services, setServices] = useState<Service[]>([]);
 
   const promoSlides = [
     {
@@ -45,35 +48,29 @@ const NeatWork = () => {
     }
   ];
 
-  const services: Service[] = [
-    {
-      id: 1,
-      title: "ART (per jam)",
-      description: "Pembersihan umum, asisten rumahan (alatmu)",
-      price: "40rb/jam",
-      image: "🧹",
-      bgColor: "service-card-blue",
-      route: "art-service"
-    },
-    {
-      id: 2,
-      title: "Deep Cleaning",
-      description: "Cleaning bergaransi kualitas dengan alat lengkap",
-      price: "80rb/jam",
-      image: "✨",
-      bgColor: "service-card-purple",
-      route: "deep-cleaning"
-    },
-    {
-      id: 3,
-      title: "Subscription & Ticket",
-      description: "Langganan pembersihan rumah",
-      image: "🎫",
-      bgColor: "service-card-green",
-      badge: "Popular",
-      route: "subscription"
-    }
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await listJenisService();
+        const items = Array.isArray((data as any)?.data)
+          ? (data as any).data
+          : (Array.isArray(data) ? (data as any) : []);
+        const mapped: Service[] = items.map((j: any, idx: number) => ({
+          id: Number(j.id ?? idx + 1),
+          title: String(j.nama_service ?? j.nama ?? j.name ?? 'Layanan'),
+          description: String(j.deskripsi ?? j.description ?? ''),
+          price: j.harga != null ? `Rp ${Number(j.harga).toLocaleString('id-ID')}/jam` : undefined,
+          image: String(j.image_url ?? '✨'),
+          bgColor: 'service-card-blue',
+          badge: undefined,
+          route: `service-${Number(j.id ?? idx + 1)}`,
+        }));
+        setServices(mapped);
+      } catch (_) {
+        setServices([]);
+      }
+    })();
+  }, []);
 
   const handleOrderService = (service: Service) => {
     setCurrentPage(service.route);
@@ -86,7 +83,84 @@ const NeatWork = () => {
   };
 
   // Service Detail Page Component
-  const ServiceDetailPage = ({ service }: { service: Service }) => (
+  const ServiceDetailPage = ({ service }: { service: Service }) => {
+    const [tanggal, setTanggal] = useState('');
+    const [waktu, setWaktu] = useState('08:00');
+    const [durasi, setDurasi] = useState(2);
+    const [gender, setGender] = useState('any');
+    const [alamat, setAlamat] = useState('');
+    const [peopleCount, setPeopleCount] = useState(1);
+    const [catatan, setCatatan] = useState('');
+    const [jenisList, setJenisList] = useState<any[]>([]);
+    const [jenisId, setJenisId] = useState<number | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+
+    const showAlert = (msg: string) => {
+      try {
+        const g: any = globalThis as any;
+        if (g && typeof g.alert === 'function') {
+          g.alert(msg);
+        } else {
+          console.log(msg);
+        }
+      } catch {
+        console.log(msg);
+      }
+    };
+
+    useEffect(() => {
+      if (service?.id) {
+        setJenisId(service.id);
+      }
+      (async () => {
+        try {
+          const data = await listJenisService();
+          const items = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+          setJenisList(items);
+          if (items.length && !jenisId && !service?.id) {
+            setJenisId(items[0].id);
+          }
+        } catch (_) {
+          // Fallback: biarkan jenisId null, backend akan menolak jika tidak diisi
+        }
+      })();
+    }, []);
+
+    const handleSubmit = async () => {
+      if (!jenisId) {
+        showAlert('Jenis layanan belum tersedia. Coba lagi nanti.');
+        return;
+      }
+      if (!tanggal || !waktu || !alamat) {
+        showAlert('Tanggal, waktu, dan alamat wajib diisi.');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const payload = {
+          jenis_service_id: jenisId,
+          alamat,
+          service_date: tanggal,
+          service_time: waktu,
+          duration: Number(durasi) || 1,
+          preferred_gender: gender || 'any',
+          people_count: Number(peopleCount) || 1,
+          catatan: catatan || undefined,
+        };
+        await createBooking(payload);
+        showAlert('Pemesanan berhasil dibuat');
+        // Optional: kembali ke Pesanan tab
+        setCurrentPage('home');
+        setActiveTab('pesanan');
+      } catch (e: any) {
+        const msg = e?.message || e?.response?.data?.message || 'Gagal membuat pemesanan';
+        showAlert(msg);
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    return (
     <div className="service-detail-page">
       {/* Header */}
       <div className="service-detail-header">
@@ -156,20 +230,38 @@ const NeatWork = () => {
           
           <div className="form-grid">
             <div>
+              <label className="form-label">Jenis Layanan</label>
+              <select
+                className="form-input"
+                value={jenisId ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setJenisId(Number(e.target.value))}
+              >
+                {jenisList.length === 0 ? (
+                  <option value="" disabled>Memuat jenis layanan...</option>
+                ) : (
+                  jenisList.map((j: any) => (
+                    <option key={j.id} value={j.id}>{j.nama_service ?? j.nama ?? j.name ?? `Service ${j.id}`}</option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div>
               <label className="form-label">Tanggal</label>
               <input 
                 type="date" 
                 className="form-input"
+                value={tanggal}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTanggal(e.target.value)}
               />
             </div>
             
             <div>
               <label className="form-label">Waktu</label>
-              <select className="form-input">
-                <option>08:00 - 10:00</option>
-                <option>10:00 - 12:00</option>
-                <option>13:00 - 15:00</option>
-                <option>15:00 - 17:00</option>
+              <select className="form-input" value={waktu} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setWaktu(e.target.value)}>
+                <option value="08:00">08:00</option>
+                <option value="10:00">10:00</option>
+                <option value="13:00">13:00</option>
+                <option value="15:00">15:00</option>
               </select>
             </div>
 
@@ -178,18 +270,18 @@ const NeatWork = () => {
               <input 
                 type="number" 
                 min="1"
-                defaultValue="2"
+                value={durasi}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDurasi(Number(e.target.value))}
                 className="form-input"
               />
             </div>
 
             <div>
               <label className="form-label">Gender Petugas</label>
-              <select className="form-input">
-                <option value="">Pilih gender petugas</option>
+              <select className="form-input" value={gender} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setGender(e.target.value)}>
+                <option value="any">Bebas / Apa saja</option>
                 <option value="female">Perempuan</option>
                 <option value="male">Laki-laki</option>
-                <option value="no-preference">Bebas / Apa saja</option>
               </select>
             </div>
 
@@ -199,6 +291,30 @@ const NeatWork = () => {
                 rows={3}
                 placeholder="Masukkan alamat lengkap..."
                 className="form-input textarea"
+                value={alamat}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAlamat(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="form-label">Jumlah Petugas</label>
+              <input 
+                type="number"
+                min="1"
+                value={peopleCount}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPeopleCount(Number(e.target.value))}
+                className="form-input"
+              />
+            </div>
+
+            <div className="form-col-span-2">
+              <label className="form-label">Catatan</label>
+              <textarea 
+                rows={2}
+                placeholder="(Opsional) catatan untuk petugas"
+                className="form-input textarea"
+                value={catatan}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCatatan(e.target.value)}
               />
             </div>
           </div>
@@ -225,13 +341,14 @@ const NeatWork = () => {
           <span className="order-bar-label">Total Estimasi</span>
           <span className="order-bar-total">Rp 80.000</span>
         </div>
-        <button className="btn btn-primary btn-full">
+        <button className="btn btn-primary btn-full" onClick={handleSubmit} disabled={submitting}>
           <span>Konfirmasi Pesanan</span>
           <span className="btn-icon">🚀</span>
         </button>
       </div>
     </div>
   );
+  };
 
   // Home Page Component
   const HomePage = () => (
@@ -345,9 +462,11 @@ const NeatWork = () => {
                 </div>
                 
                 <div className="service-image-wrapper">
-                  <span className="service-image">
-                    {service.image}
-                  </span>
+                  {(/^https?:\/\//.test(service.image) || service.image.startsWith('/')) ? (
+                    <img src={service.image} alt={service.title} className="service-image" />
+                  ) : (
+                    <span className="service-image">{service.image}</span>
+                  )}
                 </div>
               </div>
               
