@@ -648,8 +648,10 @@ const DashboardScreen = () => {
                       setMarkerCoord({ latitude, longitude });
                     }}
                   >
-                    <RNMaps.UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
-                    {markerCoord ? (
+                    {RNMaps.UrlTile ? (
+                      <RNMaps.UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+                    ) : null}
+                    {markerCoord && RNMaps.Marker ? (
                       <RNMaps.Marker coordinate={markerCoord} draggable onDragEnd={(e: any) => setMarkerCoord(e.nativeEvent.coordinate)} />
                     ) : null}
                   </RNMaps.MapView>

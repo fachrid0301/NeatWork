@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { RootStackParamList } from '../../App';
+import type { RootStackParamList } from '../navigation/types';
 import { login } from '../../services/auth.api';
 
 type LoginScreenProps = {

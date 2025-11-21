@@ -4,18 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens } from 'react-native-screens';
+import type { RootStackParamList } from './app/navigation/types';
 
 import DashboardScreen from './app/screens/DashboardScreen';
 import LoginScreen from './app/screens/LoginScreen';
 import SignUpScreen from './app/screens/SignUpScreen';
 import SplashScreen from './app/screens/SplashScreen';
-
-// ✅ Definisikan tipe untuk Stack Navigation
-export type RootStackParamList = {
-  Login: undefined;
-  SignUp: undefined;
-  Dashboard: undefined;
-};
 
 // ✅ Inisialisasi Stack Navigator
 const Stack = createNativeStackNavigator<RootStackParamList>();
